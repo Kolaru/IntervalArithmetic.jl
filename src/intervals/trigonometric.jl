@@ -137,17 +137,41 @@ function tan(a::Interval{T}) where T
 
     diam(a) > pi_interval(T).lo && return entireinterval(a)
 
-    lo_quadrant = minimum(find_quadrants(a.lo))
-    hi_quadrant = maximum(find_quadrants(a.hi))
+    lo_quadrants = find_quadrants(a.lo)
+
+    if lo_quadrants[1] == lo_quadrants[2]  # unambiguous quadrant
+        lo_quadrant = lo_quadrants[1]
+
+    else  # check if end-point is really in the other quadrant
+         if lo_quadrants[2] * half_pi(T) ⊆ a
+             lo_quadrant = lo_quadrants[1]
+
+         else
+             lo_quadrant = lo_quadrants[2]
+         end
+
+    end
+
+    hi_quadrants = find_quadrants(a.hi)
+
+    if hi_quadrants[1] == hi_quadrants[2]
+        hi_quadrant = hi_quadrants[1]
+
+    else  # check if end-point is really in the other quadrant
+         if hi_quadrants[2] * half_pi(T) ⊆ a
+             hi_quadrant = hi_quadrants[2]
+
+         else
+             hi_quadrant = hi_quadrants[1]
+         end
+
+    end
 
     lo_quadrant_mod = mod(lo_quadrant, 2)
     hi_quadrant_mod = mod(hi_quadrant, 2)
 
     if lo_quadrant_mod == 0 && hi_quadrant_mod == 1
-        # check if really contains singularity:
-        if hi_quadrant * half_pi(T) ⊆ a
-            return entireinterval(a)  # crosses singularity
-        end
+        return entireinterval(a)  # crosses singularity
 
     elseif lo_quadrant_mod == hi_quadrant_mod && hi_quadrant > lo_quadrant
         # must cross singularity
