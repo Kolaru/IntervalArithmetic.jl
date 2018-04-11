@@ -38,8 +38,8 @@ function find_quadrants(x::T) where {T}
 end
 
 function find_quadrants(x::Float64)
-    temp = multiply_by_positive_constant(x, one_over_half_pi_interval)
-    # x / half_pi(Float64)
+    # temp = multiply_by_positive_constant(x, one_over_half_pi_interval)
+    temp = x / half_pi(Float64)
 
     return SVector(floor(temp.lo), floor(temp.hi))
 end
@@ -131,58 +131,56 @@ function cos(a::Interval{T}) where T
     end
 end
 
+"""Fix endpoints in correct quadrant
+
+This is necessary only for tan (not sin or cos), since sin and cos
+are flat near the quadrant boundaries.
+"""
+
+function fix_quadrant(a, x::T) where T
+    quadrants = find_quadrants(x)
+
+    if quadrants[1] == quadrants[2]  # unambiguous quadrant
+        quadrant = quadrants[1]
+
+    else  # check if end-point is really in the other quadrant
+         if quadrants[2] * half_pi(T) ⊆ a
+             quadrant = quadrants[2]
+
+         else
+             quadrant = quadrants[1]
+         end
+
+    end
+
+    return quadrant
+end
+
 
 function tan(a::Interval{T}) where T
     isempty(a) && return a
 
     diam(a) > pi_interval(T).lo && return entireinterval(a)
 
-    lo_quadrants = find_quadrants(a.lo)
-
-    if lo_quadrants[1] == lo_quadrants[2]  # unambiguous quadrant
-        lo_quadrant = lo_quadrants[1]
-
-    else  # check if end-point is really in the other quadrant
-         if lo_quadrants[2] * half_pi(T) ⊆ a
-             lo_quadrant = lo_quadrants[1]
-
-         else
-             lo_quadrant = lo_quadrants[2]
-         end
-
-    end
-
-    hi_quadrants = find_quadrants(a.hi)
-
-    if hi_quadrants[1] == hi_quadrants[2]
-        hi_quadrant = hi_quadrants[1]
-
-    else  # check if end-point is really in the other quadrant
-         if hi_quadrants[2] * half_pi(T) ⊆ a
-             hi_quadrant = hi_quadrants[2]
-
-         else
-             hi_quadrant = hi_quadrants[1]
-         end
-
-    end
+    lo_quadrant = fix_quadrant(a, a.lo)
+    hi_quadrant = fix_quadrant(a, a.hi)
 
     lo_quadrant_mod = mod(lo_quadrant, 2)
-    hi_quadrant_mod = mod(hi_quadrant, 2)
+    #hi_quadrant_mod = mod(hi_quadrant, 2)
 
-    if lo_quadrant_mod == 0 && hi_quadrant_mod == 1
-        return entireinterval(a)  # crosses singularity
+    if lo_quadrant == hi_quadrant
+        return @round(tan(a.lo), tan(a.hi))
 
-    elseif lo_quadrant_mod == hi_quadrant_mod && hi_quadrant > lo_quadrant
-        # must cross singularity
-        return entireinterval(a)
-
+    elseif hi_quadrant - lo_quadrant == 1
+        if lo_quadrant_mod == 1
+            return @round(tan(a.lo), tan(a.hi))
+        else
+            return entireinterval(a)  # crosses singularity
+        end
     end
 
-    # @show a.lo, a.hi
-    # @show tan(a.lo), tan(a.hi)
+    return entireinterval(a)
 
-    return @round(tan(a.lo), tan(a.hi))
 end
 
 function asin(a::Interval{T}) where T
